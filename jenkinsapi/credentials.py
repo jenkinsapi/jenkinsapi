@@ -91,8 +91,8 @@ class Credentials(JenkinsBase):
         if description not in self:
             params = credential.get_attributes()
             url = (
-                '%s/credential-store/domain/_/createCredentials'
-                % self.jenkins.baseurl
+                '%s/createCredentials'
+                % self.baseurl
             )
         else:
             raise JenkinsAPIException('Updating credentials is not supported '
@@ -117,12 +117,15 @@ class Credentials(JenkinsBase):
         return self[item] if item in self else default
 
     def __delitem__(self, description):
+        if description not in self:
+            raise KeyError(
+                'Credential with description "%s" not found' % description)
         params = {
             'Submit': 'OK',
             'json': {}
         }
-        url = ('%s/credential-store/domain/_/credential/%s/doDelete'
-               % (self.jenkins.baseurl, self[description].credential_id))
+        url = ('%s/credential/%s/doDelete'
+               % (self.baseurl, self[description].credential_id))
         try:
             self.jenkins.requester.post_and_confirm_status(
                 url, params={}, data=urlencode(params)
@@ -146,3 +149,24 @@ class Credentials(JenkinsBase):
             cr = Credential(cred_dict)
 
         return cr
+
+
+class Credentials2x(Credentials):
+    """
+    This class provides a container-like API which gives
+    access to all global credentials on a Jenkins node.
+
+    Returns a list of Credential Objects.
+    """
+    def _poll(self, tree=None):
+        url = self.python_api_url(self.baseurl) + '?depth=2'
+        data = self.get_data(url, tree=tree)
+        credentials = data['credentials']
+        new_creds = {}
+        for cred_dict in credentials:
+            cred_dict['credential_id'] = cred_dict['id']
+            new_creds[cred_dict['id']] = self._make_credential(cred_dict)
+
+        data['credentials'] = new_creds
+
+        return data

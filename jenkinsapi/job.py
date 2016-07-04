@@ -70,7 +70,29 @@ class Job(JenkinsBase, MutableJenkinsThing):
             'hg': self._get_hg_branch,
             None: lambda element_tree: []
         }
-        JenkinsBase.__init__(self, url)
+        self.url = url
+        if self.url is None:
+            self.url = self._find_job_url(name)
+        JenkinsBase.__init__(self, self.url)
+
+    def _find_job_url(self, job_name):
+        search_result = self.jenkins.requester.get_url(
+            self.jenkins.baseurl + '/search/suggest?query=' + job_name,
+            headers={
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            allow_redirects=False)
+        if search_result.status_code != 200:
+            raise NotFound('Job %s not found in Jenkins', job_name)
+        full_job_name = search_result.json()['suggestions'][0]['name']
+        search_result = self.jenkins.requester.get_url(
+            self.jenkins.baseurl + '/search/?q=' + full_job_name,
+            allow_redirects=False)
+        if search_result.status_code != 302:
+            raise NotFound('Job %s not found in Jenkins', job_name)
+
+        return search_result.headers['Location']
 
     def __str__(self):
         return self.name
@@ -138,11 +160,8 @@ class Job(JenkinsBase, MutableJenkinsThing):
             self._element_tree = ET.fromstring(self._config)
         return self._element_tree
 
-    def get_build_triggerurl(self, files, build_params=None):
-        if (files and build_params) or (not self.has_params()):
-            # If job has file parameters and non-file parameters - it must be
-            # triggered using "/build", not by "/buildWithParameters"
-            # "/buildWithParameters" will ignore non-file parameters
+    def get_build_triggerurl(self):
+        if not self.has_params():
             return "%s/build" % self.baseurl
         return "%s/buildWithParameters" % self.baseurl
 
@@ -194,7 +213,7 @@ class Job(JenkinsBase, MutableJenkinsThing):
         build_params = build_params and dict(
             build_params.items()) or {}  # Via POSTed JSON
 
-        url = self.get_build_triggerurl(files, build_params)
+        url = self.get_build_triggerurl()
         if cause:
             build_params['cause'] = cause
 
@@ -219,12 +238,7 @@ class Job(JenkinsBase, MutableJenkinsThing):
         redirect_url = response.headers['location']
 
         if not redirect_url.startswith("%s/queue/item" % self.jenkins.baseurl):
-            if files:
-                raise ValueError('Builds with file parameters are not '
-                                 'supported by this jenkinsapi version. '
-                                 'Please use previous version.')
-            else:
-                raise ValueError("Not a Queue URL: %s" % redirect_url)
+            raise ValueError("Not a Queue URL: %s" % redirect_url)
 
         qi = QueueItem(redirect_url, self.jenkins)
         if block:
@@ -667,8 +681,13 @@ class Job(JenkinsBase, MutableJenkinsThing):
         """
         If job has parameters, returns True, else False
         """
-        return any("parameterDefinitions" in a for a in (
-            self._data["actions"] or self._data["property"]) if a)
+        if any("parameterDefinitions" in a for a in (self._data["actions"])
+               if a):
+            return True
+        if any("parameterDefinitions" in a for a in (self._data["property"])
+               if a):
+            return True
+        return False
 
     def has_queued_build(self, build_params):
         """Returns True if a build with build_params is currently queued."""

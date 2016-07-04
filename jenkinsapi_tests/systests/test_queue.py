@@ -9,6 +9,8 @@ try:
 except ImportError:
     import unittest
 from jenkinsapi.queue import Queue
+from jenkinsapi.queue import QueueItem
+from jenkinsapi.job import Job
 from jenkinsapi_tests.systests.base import BaseSystemTest
 from jenkinsapi_tests.test_utils.random_strings import random_string
 from jenkinsapi_tests.systests.job_configs import LONG_RUNNING_JOB
@@ -17,7 +19,6 @@ log = logging.getLogger(__name__)
 
 
 class TestQueue(BaseSystemTest):
-
     """
     All kinds of testing on Jenkins Queues
     """
@@ -31,6 +32,10 @@ class TestQueue(BaseSystemTest):
         job_names = [random_string() for _ in range(5)]
         jobs = []
 
+        while len(self.jenkins.get_queue()) != 0:
+            log.info('Sleeping to get queue empty...')
+            time.sleep(1)
+
         for job_name in job_names:
             j = self.jenkins.create_job(job_name, LONG_RUNNING_JOB)
             jobs.append(j)
@@ -42,6 +47,13 @@ class TestQueue(BaseSystemTest):
 
         reprString = repr(queue)
         self.assertIn(queue.baseurl, reprString)
+        self.assertTrue(len(queue) == 5, queue.keys())
+        self.assertIsInstance(queue[queue.keys()[0]].get_job(), Job)
+        items = queue.get_queue_items_for_job(job_names[2])
+        self.assertIsInstance(items, list)
+        self.assertEquals(len(items), 1)
+        self.assertIsInstance(items[0], QueueItem)
+        self.assertEquals(items[0].get_parameters(), [])
 
         for _, item in queue.iteritems():
             queue.delete_item(item)
@@ -67,6 +79,22 @@ class TestQueue(BaseSystemTest):
         time.sleep(1)
         self.assertFalse(j.is_queued_or_running())
 
+    def test_queueitem_for_why_field(self):
+        # Make some jobs just in case there aren't any.
+        job_names = [random_string() for _ in range(2)]
+        jobs = []
+        for job_name in job_names:
+            j = self.jenkins.create_job(job_name, LONG_RUNNING_JOB)
+            jobs.append(j)
+            j.invoke()
+
+        queue = self.jenkins.get_queue()
+        for _, item in queue.iteritems():
+            self.assertIsInstance(item.why, str)
+
+        # Clean up after ourselves
+        for _, item in queue.iteritems():
+            queue.delete_item(item)
 
 if __name__ == '__main__':
     logging.basicConfig()
