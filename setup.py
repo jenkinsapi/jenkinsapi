@@ -32,7 +32,7 @@ setup(
         'jenkinsapi_tests'],
     zip_safe=True,
     include_package_data=False,
-    install_requires=['requests>=2.3.0', 'pytz>=2014.4'],
+    install_requires=['requests>=2.3.0', 'pytz>=2016.4'],
     test_suite='nose.collector',
     tests_require=['mock', 'nose', 'coverage', 'unittest2'],
     entry_points=GLOBAL_ENTRY_POINTS,
