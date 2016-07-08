@@ -20,7 +20,7 @@
 		</delete>
 	</target>
 
-	<target name="compile" depends="install,test,sdist,doc" />
+	<target name="compile" depends="install,test,sdist" />
 
 	<target name="install">
 		<exec executable="python">
@@ -50,14 +50,6 @@
 				<arg value="bdist_wheel" />
 				<arg value="upload" />
 			</exec>
-		</target>	
-
-	<target name="doc" depends="">
-		<exec executable="python">
-			<arg value="setup.py" />
-			<arg value="build_sphinx" />
-			<arg value="upload_sphinx" />
-		</exec>
-	</target>
+		</target>
 
 </project>
