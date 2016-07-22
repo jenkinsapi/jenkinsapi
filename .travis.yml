@@ -1,21 +1,30 @@
 language: python
-
 python:
-    - "2.7"
-    - "3.3"
-    - "3.4"
-
+- '2.7'
+- '3.3'
+- '3.4'
 env:
-    - JENKINS_VERSION=stable
-    - JENKINS_VERSION=latest
-
-# command to install dependencies, e.g. pip install -r requirements.txt --use-mirrors
+- JENKINS_VERSION=stable
+- JENKINS_VERSION=latest
 install:
-    - pip install nose mock coverage pep8 "astroid<1.3.0" "pylint<1.4"
-    - python setup.py develop
-
-# command to run tests, e.g. python setup.py test
+- pip install nose mock coverage pep8 "astroid<1.3.0" "pylint<1.4" twine
+- python setup.py develop
 script:
-    - pep8 --ignore=E501 jenkinsapi/*.py
-    - pylint --rcfile=pylintrc jenkinsapi/*.py --disable R0912
-    - nosetests -v jenkinsapi_tests
+- pep8 --ignore=E501 jenkinsapi/*.py
+- pylint --rcfile=pylintrc jenkinsapi/*.py --disable R0912
+- nosetests -v jenkinsapi_tests
+after_success:
+- |
+  if [ "$TRAVIS_PULL_REQUEST" = "false" ]; then
+      if [ "$TRAVIS_BRANCH" = "master" ]; then
+          python setup.py sdist bdist_wheel --universal
+      fi
+  fi
+deploy:
+  provider: pypi
+  user: lechat
+  password:
+    secure: XW/16gJCG7wKeuF2DB2XSiyNa8Jz5/v4ccYexhH9EScKJl+5PHGLruCCyGssS8KV7veR2EJoFVSkmvtDRIxFuIUmeXPu+m3JOv/4SU6TLyhmFkC6b2nygF/HBoX8+ISrywcsGd6r7zi9Ahudy6nLZBZCWRfGoLzBu/6BSe3bq3N0rExu+VXbjoyUIdBKDhrcDFmzIly7vBpHhUBz1PUl76G2TxTSh9Az4Fy/ApYgILb6C5AkVMNc8Yz95uo5lpCRDWbuNMCUz3dwlz2MC6I8AIgi1FzRCZqBKWR45O2eVJu5CCAcZkNWkVQaD8XfTUrbgJEKqxyW34tcYAfLsAxMiKkzjEA8E55g7XAyOC/VkWDuBKltH88bLapbx+5p2YjRmkSR0CHXF+bpCeeU6qaWDRT/3uz6/xRLm4EF49fT1N2MC0gyzKv8EtU3PScd6MAhJSZidvF2OQt5NqlcEjrH53ETUKWF6+u0z2PTo5LEngYBHZgf0WgkRq+WMu/G9JYW3L1vBtW0zRF2NUxnY6L4Ro3S8CQ5OnA8kAsr3Sv8hguhnjvmI2jmJNKeo8i9LysFj5WzLhNi2SO/Go7KqZsCPVmCQE69xpnE3GMgymzQu+ml8QCWNULHYsUBbXRCRzStR8LrDKFgd85sCvGmVAfAOCmCNKnNk6MRDZqMD3AvcgE=
+  on:
+    distributions: sdist bdist_wheel
+    repo: jenkinsapi/jenkinsapi
